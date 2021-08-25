@@ -1,40 +1,29 @@
 # Twitch Data Generator
 
-## 
+To ingest Twitch data into Kafka, we’ll use use existing Python wrappers for the Twitch Helix API ([`python-twitch-client`](https://github.com/tsifrer/python-twitch-client)) and Kafka ([`confluent-kafka`](https://github.com/confluentinc/confluent-kafka-python)) to write a minimal producer.
 
-To ingest Twitch data into Kafka, we’ll use a short script to
+## Twitch Authentication Flow
 
+To work with data from Twitch, you first need to [register an app](https://dev.twitch.tv/docs/authentication#registration) and get a hold of your app access tokens. Remember to replace `<client_id>` and `<client_secret>` in the [producer](twitch_kafka_producer.py)!
 
-use existing Python wrappers for the Twitch Helix API ([`python-twitch-client`](https://github.com/tsifrer/python-twitch-client)) and Kakfa ([`confluent-kafka`](https://github.com/confluentinc/confluent-kafka-python)) to write a minimal producer (`data-generator/twitch_kafka_producer.py`).
+### Kafka Producer (Python)
 
-## Producing data to Kafka
+In this demo, we use the `streams` endpoint to produce events about active streams into Kafka. As with all real-world data, there's a few catches to be aware of before getting to the actual processing:
 
-#### Twitch Authentication Flow
+1. The endpoint returns events sorted by number of current viewers, so there might be duplicate or missing events as viewers join and leave. As new events flow in for the same `id`, we're only ever interested in keeping the most recent values; so we'll need [`UPSERT`](https://materialize.com/docs/sql/create-source/json-kafka/#upsert-envelope-details) to retract old values and keep things fresh.
 
-To work with data from Twitch, we first need to [register an app](https://dev.twitch.tv/docs/authentication#registration) and get a hold of our [app access tokens](). In this demo, we'll use the `streams` endpoint to produce events about active streams into Kafka, and the `/tags/streams` endpoint to grab all stream tags defined by Twitch.
+2. Events have a `started_at` timestamp, but there's no way of knowing when a stream is finished. Because _the maximum broadcast length is 48 hours_; we can lean on that to expire events in state using a [temporal filter](https://materialize.com/docs/guides/temporal-filters/#main).
 
-<details>
-<summary>Twitch Developer Console</summary>
+3. Each stream may have up to five tags, so we'll end up with a JSON array literal in `tag_ids` for each record.
 
-![Kafka Producer App](https://user-images.githubusercontent.com/23521087/123405059-bfdc3080-d5a9-11eb-8976-473806f9097d.png)
-</details> 
+Once you've get the setup up and running, you can check that the `twitch-streams` topic has been created:
 
-#### Kafka Producer (Python)
-
-
-
-Two things to keep in mind about the data:
-
-1. **Duplicates:** streams are returned sorted by number of current viewers, in descending order. Across multiple pages of results, there may be duplicate or missing streams, as viewers join and leave.
-
-2. **Streams with multiple categories:** each stream may have up to five tags, so we'll end up with a JSON array literal for each record.
-
-Check that the `twitch-streams` topic has been created:
-
-`docker-compose exec kafka kafka-topics --list --bootstrap-server kafka:9092`
+```bash
+docker-compose exec kafka kafka-topics --list --bootstrap-server kafka:9092
+```
 
 And that there's data landing in Kafka:
 
-`docker-compose exec kafka kafka-console-consumer --bootstrap-server kafka:29092 --topic twitch-streams --from-beginning`
-
-https://user-images.githubusercontent.com/23521087/123432486-bd3e0300-d5ca-11eb-80d2-5086396f0a55.mp4
+```bash
+docker-compose exec kafka kafka-console-consumer --bootstrap-server kafka:29092 --topic twitch-streams --from-beginning
+```
