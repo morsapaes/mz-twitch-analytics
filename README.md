@@ -102,34 +102,44 @@ CREATE VIEWS FROM SOURCE mz_source (stream_tag_ids);
 
 ```sql
 CREATE MATERIALIZED VIEW mv_agg_stream_game AS
-SELECT game_name,
+SELECT game_id,
+       game_name,
        COUNT(id) AS cnt_streams,
        SUM(viewer_count) AS agg_viewer_cnt
 FROM v_twitch_stream
 WHERE game_id IS NOT NULL
-GROUP BY game_name;
+GROUP BY game_id, game_name;
 ```
 
 #### What are the top10 games being played?
 
 ```sql
-SELECT game_name, agg_viewer_cnt FROM mv_agg_stream_game ORDER BY agg_viewer_cnt DESC LIMIT 10;
+SELECT game_name, 
+       cnt_streams, 
+       agg_viewer_cnt 
+FROM mv_agg_stream_game 
+ORDER BY agg_viewer_cnt 
+DESC LIMIT 10;
 ```
 
 #### Is anyone playing DOOM?
 
 ```sql
-SELECT * FROM mv_agg_stream_game WHERE upper(game_name) LIKE 'DOOM%';
+SELECT game_name, 
+       cnt_streams, 
+       agg_viewer_cnt 
+FROM mv_agg_stream_game 
+WHERE upper(game_name) LIKE 'DOOM%';
 ```
 
-### What streams started in the last 15 minutes?
+### What gaming streams started in the last 15 minutes?
 
 ```sql
 CREATE MATERIALIZED VIEW mv_stream_15min AS
 SELECT title,
        user_name,
        game_name,
-     started_at
+       started_at
 FROM v_twitch_stream
 WHERE game_id IS NOT NULL
   AND (mz_logical_timestamp() >= (extract('epoch' from started_at)*1000)::bigint 
@@ -140,7 +150,7 @@ WHERE game_id IS NOT NULL
 SELECT MIN(started_at) FROM mv_stream_15min;
 ```
 
-### What are the most popular tags?
+### What are the most used tags?
 
 ```sql
 CREATE MATERIALIZED VIEW mv_agg_stream_tag AS
@@ -187,10 +197,19 @@ LATERAL (
 
 ## Metabase
 
-To visualize the results, navigate to (http://localhost:3030).
+To visualize the results, navigate to (http://localhost:3030) and log into Metabase using:
 
+`email: demo-twitch@materialize.com`
 
-There should be a default dashboard named "What's streaming on Twitch?" listed under `Dashboards`:
+`password: dem0twitch`
+
+There should be a pinned dashboard named "What's streaming on Twitch?" listed under `Start Here`. The min. refresh rate in Metabase is 1 minute, but you can manually set it to 1 second by adding `#refresh=1` to the end of the URL:
+
+`http://localhost:3030/dashboard/1-whats-streaming-on-twitch#refresh=1`
+
+and open the modified URL in a new tab:
+
+![Metabase](https://user-images.githubusercontent.com/23521087/130734450-9b5d2225-58ed-472f-96a2-976e4b72d1e9.gif)
 
 <hr>
 
