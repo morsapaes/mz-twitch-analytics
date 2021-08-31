@@ -1,18 +1,24 @@
 # What's streaming on Twitch?
 
-<p align="center">
-<img width="600" alt="demo_overview" src="https://user-images.githubusercontent.com/23521087/130613715-5cd0aa0e-a2cc-4bc5-aa42-8309a77a8895.png">
-</p>
+In this demo, we'll try to make some sense of Twitch using **[Materialize](https://materialize.com/docs/)** and some good ol' **standard SQL**.
+
+**First things first** :point_down:
+
+To work with data from Twitch, you need to [register an app](https://dev.twitch.tv/docs/authentication#registration) and get a hold of your app access tokens. If you already have an account, the process should be quick and painless! After cloning this repo, remember to replace `<client_id>` and `<client_secret>` in the [Kafka producer file](./data-generator/twitch_kafka_producer.py) with the valid credentials.
 
 ## Docker
+
+We'll use Docker Compose to make it easier to bundle up all the services behind our Twitch analytics pipeline:
+
+<p align="center">
+<img width="650" alt="demo_overview" src="https://user-images.githubusercontent.com/23521087/130613715-5cd0aa0e-a2cc-4bc5-aa42-8309a77a8895.png">
+</p>
 
 #### Getting the setup up and running
 
 ```bash
 
 # Start the setup
-docker-compose build
-
 docker-compose up -d
 
 # Is everything really up and running?
@@ -21,21 +27,26 @@ docker-compose ps
 
 ## Kafka
 
-Check that the `twitch-streams` topic has been created:
+The data generator will produce JSON-formatted events into the `twitch-streams` Kafka topic. To check that the topic has been created:
 
 ```bash
-docker-compose exec kafka kafka-topics --list --bootstrap-server kafka:9092
+docker-compose exec kafka kafka-topics \
+    --list \
+    --bootstrap-server kafka:9092
 ```
 
-And that there's data landing in Kafka:
+and that there's data landing:
 
 ```bash
-docker-compose exec kafka kafka-console-consumer --bootstrap-server kafka:29092 --topic twitch-streams --from-beginning
+docker-compose exec kafka kafka-console-consumer \
+    --bootstrap-server kafka:29092 \
+    --topic twitch-streams \
+    --from-beginning
 ```
 
 ## Materialize
 
-Connect to Materialize using the `mzcli`:
+To connect to the running Materialize service, we can use any [compatible CLI](https://materialize.com/docs/connect/cli/). Because we're on Docker, let's roll with `mzcli`:
 
 ```bash
 docker-compose run mzcli
@@ -45,7 +56,7 @@ docker-compose run mzcli
 
 #### Kafka JSON source
 
-The first step to consume our JSON events in Materialize is to create a [Kafka+JSON source](https://materialize.com/docs/sql/create-source/json-kafka/):
+The first step to consume JSON events from Kafka in Materialize is to create a [Kafka+JSON source](https://materialize.com/docs/sql/create-source/json-kafka/):
 
 ```sql
 CREATE SOURCE kafka_twitch
@@ -55,7 +66,11 @@ FROM KAFKA BROKER 'kafka:9092' TOPIC 'twitch-streams'
 ENVELOPE UPSERT;
 ```
 
-Because the data is stored as raw bytes, we need to do some casting to convert it to a readable format:
+>**Why do we need `ENVELOPE UPSERT`?**
+>
+>The Twitch Helix API returns [`streams`](https://dev.twitch.tv/docs/api/reference/#get-streams) events sorted by number of current viewers. This means that there might be **duplicate** or **missing events** as viewers join and leave a broadcast — which we'll have to deal with. As new events flow in for the same Kafka key (`id`), we're only ever interested in keeping the most recent values, so we'll use [`ENVELOPE UPSERT`](https://materialize.com/docs/sql/create-source/json-kafka/#upsert-envelope-details) to make sure Materialize can also handle updates (and the associated retractions!).
+
+The data is stored as raw bytes, so we need to do some casting to convert it to a readable format next:
 
 ```sql
 CREATE VIEW v_twitch_stream_conv AS
@@ -95,10 +110,10 @@ FROM POSTGRES
 ```sql
 CREATE VIEWS FROM SOURCE mz_source (stream_tag_ids);
 ```
+ 
+### Ask questions!
 
-## Ask questions!
-
-### What are the most popular games on Twitch?
+#### What are the most popular games on Twitch?
 
 ```sql
 CREATE MATERIALIZED VIEW mv_agg_stream_game AS
@@ -111,7 +126,7 @@ WHERE game_id IS NOT NULL
 GROUP BY game_id, game_name;
 ```
 
-#### What are the top10 games being played?
+**What are the top10 games being played?**
 
 ```sql
 SELECT game_name, 
@@ -122,7 +137,7 @@ ORDER BY agg_viewer_cnt
 DESC LIMIT 10;
 ```
 
-#### Is anyone playing DOOM?
+**Is anyone playing DOOM?**
 
 ```sql
 SELECT game_name, 
@@ -132,7 +147,7 @@ FROM mv_agg_stream_game
 WHERE upper(game_name) LIKE 'DOOM%';
 ```
 
-### What gaming streams started in the last 15 minutes?
+#### What gaming streams started in the last 15 minutes?
 
 ```sql
 CREATE MATERIALIZED VIEW mv_stream_15min AS
@@ -150,7 +165,7 @@ WHERE game_id IS NOT NULL
 SELECT MIN(started_at) FROM mv_stream_15min;
 ```
 
-### What are the most used tags?
+#### What are the most used tags?
 
 ```sql
 CREATE MATERIALIZED VIEW mv_agg_stream_tag AS
@@ -170,7 +185,7 @@ JOIN stream_tag_ids st ON un.tg = st.tag_id AND NOT st.is_auto;
 SELECT * FROM mv_agg_stream_tag ORDER BY cnt_tag DESC;
 ```
 
-### Who are the most popular streamers for each of the top10 games?
+#### Who are the most popular streamers for each of the top10 games?
 
 ```sql
 CREATE VIEW v_stream_game_top10 AS 
@@ -197,7 +212,7 @@ LATERAL (
 
 ## Metabase
 
-To visualize the results, navigate to (http://localhost:3030) and log into Metabase using:
+To visualize the results in Metabase, navigate to (http://localhost:3030) and log in using:
 
 `email: demo-twitch@materialize.com`
 
