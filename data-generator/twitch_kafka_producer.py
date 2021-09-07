@@ -6,8 +6,8 @@ from itertools import islice
 import json
 from confluent_kafka import Producer
 
-client = twitch.TwitchHelix(client_id=<client_id>,
-                            client_secret=<client_secret>,
+client = twitch.TwitchHelix(client_id='<client_id>',
+                            client_secret='<client_secret>',
                             scopes=[twitch.constants.OAUTH_SCOPE_ANALYTICS_READ_EXTENSIONS])
 client.get_oauth()
 
