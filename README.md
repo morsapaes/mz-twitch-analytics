@@ -4,11 +4,11 @@ In this demo, we'll try to make some sense of Twitch using **[Materialize](https
 
 **First things first** :point_down:
 
-To work with data from Twitch, you need to [register an app](https://dev.twitch.tv/docs/authentication#registration) and get a hold of your app access tokens. If you already have an account, the process should be quick and painless! After cloning this repo, remember to replace `<client_id>` and `<client_secret>` in the [Kafka producer file](./data-generator/twitch_kafka_producer.py) with the valid credentials.
+To work with data from Twitch, you need to [register an app](https://dev.twitch.tv/docs/authentication#registration) and get a hold of your app access tokens. If you already have an account, the process should be pretty smooth! After cloning this repo, remember to replace `<client_id>` and `<client_secret>` in the [Kafka producer file](./data-generator/twitch_kafka_producer.py) with the valid credentials.
 
 ## Docker
 
-We'll use Docker Compose to make it easier to bundle up all the services behind our Twitch analytics pipeline:
+We'll use Docker Compose to make it easier to bundle up all the services for our Twitch analytics pipeline:
 
 <p align="center">
 <img width="650" alt="demo_overview" src="https://user-images.githubusercontent.com/23521087/130613715-5cd0aa0e-a2cc-4bc5-aa42-8309a77a8895.png">
@@ -27,7 +27,7 @@ docker-compose ps
 
 ## Kafka
 
-The data generator will produce JSON-formatted events into the `twitch-streams` Kafka topic. To check that the topic has been created:
+The data generator produces **JSON-formatted** events about [active streams](https://dev.twitch.tv/docs/api/reference/#get-streams) on Twitch into the `twitch-streams` Kafka topic. To check that the topic has been created:
 
 ```bash
 docker-compose exec kafka kafka-topics \
@@ -39,10 +39,14 @@ and that there's data landing:
 
 ```bash
 docker-compose exec kafka kafka-console-consumer \
-    --bootstrap-server kafka:29092 \
+    --bootstrap-server kafka:9092 \
     --topic twitch-streams \
     --from-beginning
 ```
+
+## Postgres
+
+Postgres is bootstrapped with the list of [stream tags](https://dev.twitch.tv/docs/api/reference/#get-all-stream-tags) that can be used to describe live streams and categories. This reference data allows us to enrich `twitch-streams` events with the description for each `tag_id`.
 
 ## Materialize
 
@@ -56,7 +60,7 @@ docker-compose run mzcli
 
 #### Kafka JSON source
 
-The first step to consume JSON events from Kafka in Materialize is to create a [Kafka+JSON source](https://materialize.com/docs/sql/create-source/json-kafka/):
+**1.** The first step to consume JSON events from Kafka in Materialize is to create a [Kafka+JSON source](https://materialize.com/docs/sql/create-source/json-kafka/):
 
 ```sql
 CREATE SOURCE kafka_twitch
@@ -68,9 +72,9 @@ ENVELOPE UPSERT;
 
 >**Why do we need `ENVELOPE UPSERT`?**
 >
->The Twitch Helix API returns [`streams`](https://dev.twitch.tv/docs/api/reference/#get-streams) events sorted by number of current viewers. This means that there might be **duplicate** or **missing events** as viewers join and leave a broadcast — which we'll have to deal with. As new events flow in for the same Kafka key (`id`), we're only ever interested in keeping the most recent values, so we'll use [`ENVELOPE UPSERT`](https://materialize.com/docs/sql/create-source/json-kafka/#upsert-envelope-details) to make sure Materialize can also handle updates (and the associated retractions!).
+>The Twitch Helix API returns events sorted by number of current viewers. This means that there might be **duplicate** or **missing events** as viewers join and leave a broadcast — which we'll have to deal with. As new events flow in for the same Kafka key (`id`), we're only ever interested in keeping the most recent values, so we'll use [`ENVELOPE UPSERT`](https://materialize.com/docs/sql/create-source/json-kafka/#upsert-envelope-details) to make sure Materialize can also handle updates (and the associated retractions!).
 
-The data is stored as raw bytes, so we need to do some casting to convert it to a readable format next:
+**2.** The data is stored as raw bytes, so we need to do some casting to convert it to a readable format (and appropriate data types) next:
 
 ```sql
 CREATE VIEW v_twitch_stream_conv AS
@@ -100,14 +104,14 @@ FROM v_twitch_stream_conv;
 
 #### Postgres source
 
+**1.** One way to connect to a Postgres database in Materialize is to use a [Postgres source](https://materialize.com/docs/sql/create-source/postgres/), which uses [logical replication](https://www.postgresql.org/docs/10/logical-replication.html) to continuously ingest changes and maintain freshly updated results:
+
 ```sql
 CREATE MATERIALIZED SOURCE mz_source 
 FROM POSTGRES
   CONNECTION 'host=postgres port=5432 user=postgres dbname=postgres password=postgres'
   PUBLICATION 'mz_source';
-```
 
-```sql
 CREATE VIEWS FROM SOURCE mz_source (stream_tag_ids);
 ```
  
@@ -212,19 +216,55 @@ LATERAL (
 
 ## Metabase
 
-To visualize the results in Metabase, navigate to (http://localhost:3030) and log in using:
+To visualize the results in [Metabase](https://www.metabase.com/):
 
-`email: demo-twitch@materialize.com`
+**1.** In a browser, navigate to <localhost:3030> (or <`host`:3030>, if running on a VM).
 
-`password: dem0twitch`
+**2.** Click **Let's get started**.
 
-There should be a pinned dashboard named "What's streaming on Twitch?" listed under `Start Here`. The min. refresh rate in Metabase is 1 minute, but you can manually set it to 1 second by adding `#refresh=1` to the end of the URL:
+**3.** Complete the first set of fields asking for your email address. This
+    information isn't crucial for anything but has to be filled in.
+
+**4.** On the **Add your data** page, specify the connection properties for the Materialize database:
+
+Field             | Value
+----------------- | ----------------
+Database          | Materialize
+Name              | twitch
+Host              | **materialized**
+Port              | **6875**
+Database name     | **materialize**
+Database username | **materialize**
+Database password | Leave empty
+
+**5.** Click **Ask a question** -> **Native query**.
+
+**6.** Under **Select a database**, choose **twitch**.
+
+**7.** In the query editor, enter:
+
+```sql
+SELECT SUM(cnt_streams) FROM mv_agg_stream_game;
+```
+    
+and hit **Save**. You need to do this for each visualization you’re planning to add to the dashboard that Metabase prompts you to create.
+
+**8.** Once you have a dashboard set up, you can manually set the refresh rate to 1 second by adding `#refresh=1` to the end of the URL: 
 
 `http://localhost:3030/dashboard/1-whats-streaming-on-twitch#refresh=1`
 
-and open the modified URL in a new tab:
+and opening the modified URL in a new tab:
 
 ![Metabase](https://user-images.githubusercontent.com/23521087/130734450-9b5d2225-58ed-472f-96a2-976e4b72d1e9.gif)
 
 <hr>
 
+### TODO
+
+- [ ] **Improve the Kafka producer:** 
+
+    In the future, it'd be preferable to use [PubSub](https://dev.twitch.tv/docs/pubsub) to subscribe to a topic for updates instead of periodically sending requests to the Twitch Helix API.
+    
+- [ ] **Pre-load the Metabase dashboard:** 
+
+    Include a backup of Metabase's [embedded database](https://www.metabase.com/docs/latest/operations-guide/backing-up-metabase-application-data.html) (H2) with a bootstrapped dashboard to save users some time in this step.
