@@ -47,12 +47,8 @@ services:
      - ${PWD}/postgres-image:/docker-entrypoint-initdb.d
   metabase:
     image: materialize/metabase:v0.0.5
-    volumes:
-      - ./metabase-data/metabase.db:/data/metabase.db
+    container_name: metabase
     depends_on:
        - materialized
-    environment:
-       - MB_DB_TYPE=h2
-       - MB_DB_FILE=/data/metabase.db
     ports:
       - 3030:3000
