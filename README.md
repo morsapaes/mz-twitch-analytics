@@ -11,7 +11,7 @@ To work with data from Twitch, you need to [register an app](https://dev.twitch.
 We'll use Docker Compose to make it easier to bundle up all the services for our Twitch analytics pipeline:
 
 <p align="center">
-<img width="650" alt="demo_overview" src="https://user-images.githubusercontent.com/23521087/130613715-5cd0aa0e-a2cc-4bc5-aa42-8309a77a8895.png">
+<img width="650" alt="demo_overview" src="https://user-images.githubusercontent.com/23521087/133231555-07a92479-de4d-44b1-b0c9-6fa819e3cbcb.png">
 </p>
 
 #### Getting the setup up and running
