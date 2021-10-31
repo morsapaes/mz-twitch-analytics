@@ -1,12 +1,14 @@
 # What's streaming on Twitch?
 
-In this demo, we'll try to make some sense of Twitch using **[Materialize](https://materialize.com/docs/)** and some good ol' **standard SQL**.
+This demo uses **[Materialize](https://materialize.com/docs/)** to tap into what’s happening on Twitch _right now_, and shows how far you can push standard SQL to explore streaming data.
 
 **First things first** :point_down:
 
 To work with data from Twitch, you need to [register an app](https://dev.twitch.tv/docs/authentication#registration) and get a hold of your app access tokens. If you already have an account, the process should be pretty smooth! After cloning this repo, remember to replace `<client_id>` and `<client_secret>` in the [Kafka producer file](./data-generator/twitch_kafka_producer.py) with the valid credentials.
 
 ## Docker
+
+> **Warning:** The setup in this repo does **not run** on M1 Macbooks. For an ARM-compatible version (using Redpanda as a drop-in replacement for Kafka), check out [this repo](https://github.com/morsapaes/mz-twitch-analytics-rp).
 
 We'll use Docker Compose to make it easier to bundle up all the services for our Twitch analytics pipeline:
 
