@@ -168,6 +168,10 @@ WHERE game_id IS NOT NULL
 ```
 
 ```sql
+SELECT * FROM mv_stream_15min ORDER BY started_at ASC LIMIT 10;
+```
+
+```sql
 SELECT MIN(started_at) FROM mv_stream_15min;
 ```
 
