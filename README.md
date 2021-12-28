@@ -235,7 +235,7 @@ To visualize the results in [Metabase](https://www.metabase.com/):
 
 Field             | Value
 ----------------- | ----------------
-Database          | Materialize
+Database          | PostgreSQL
 Name              | twitch
 Host              | **materialized**
 Port              | **6875**
@@ -243,7 +243,7 @@ Database name     | **materialize**
 Database username | **materialize**
 Database password | Leave empty
 
-**5.** Click **Ask a question** -> **Native query**.
+**5.** Click **Ask a question** -> **Native query**. You can find instructions to reproduce the dashboard below under [metabase/README.md](/metabase/README.md#metabase).
 
 **6.** Under **Select a database**, choose **twitch**.
 

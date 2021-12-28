@@ -26,7 +26,7 @@ services:
     depends_on:
       - kafka
   materialized:
-    image: materialize/materialized:v0.9.0
+    image: materialize/materialized:v0.12.0
     container_name: materialized
     init: true
     command: -w1 --disable-telemetry --experimental
@@ -46,7 +46,7 @@ services:
     volumes:
      - ${PWD}/postgres-image:/docker-entrypoint-initdb.d
   metabase:
-    image: materialize/metabase:v0.0.5
+    image: metabase/metabase
     container_name: metabase
     depends_on:
        - materialized
