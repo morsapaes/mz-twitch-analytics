@@ -29,7 +29,7 @@ services:
     image: materialize/materialized:v0.12.0
     container_name: materialized
     init: true
-    command: -w1 --disable-telemetry --experimental
+    command: -w1 --disable-telemetry
     ports:
       - 6875:6875
   mzcli:
