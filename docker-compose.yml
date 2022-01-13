@@ -28,7 +28,6 @@ services:
   materialized:
     image: materialize/materialized:v0.12.0
     container_name: materialized
-    init: true
     command: -w1 --disable-telemetry
     ports:
       - 6875:6875
