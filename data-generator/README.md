@@ -1,6 +1,6 @@
 # Twitch Data Generator
 
-To ingest Twitch data into Kafka, we’ll use use existing Python wrappers for the Twitch Helix API ([`python-twitch-client`](https://github.com/tsifrer/python-twitch-client)) and Kafka ([`confluent-kafka`](https://github.com/confluentinc/confluent-kafka-python)) to write a minimal producer.
+To ingest Twitch data into Kafka, we’ll use existing Python wrappers for the Twitch Helix API ([`python-twitch-client`](https://github.com/tsifrer/python-twitch-client)) and Kafka ([`confluent-kafka`](https://github.com/confluentinc/confluent-kafka-python)) to write a minimal producer.
 
 ## Twitch Authentication Flow
 
