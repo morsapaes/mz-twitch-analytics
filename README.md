@@ -87,7 +87,7 @@ FROM (
 );
 
 CREATE VIEW v_twitch_stream AS
-SELECT CAST(nullif((data->>'id')::string, '') AS bigint)AS id,
+SELECT CAST(nullif((data->>'id')::string, '') AS bigint) AS id,
        CAST(nullif((data->>'user_id')::string, '') AS int) AS user_id,
        (data->>'user_login')::string AS user_login,
        (data->>'user_name')::string AS user_name,
